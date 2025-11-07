@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/layout"
@@ -12,7 +13,20 @@ import (
 	"gioui.org/widget/material"
 )
 
+// Define the progress variables, a channel and a variable
+var progress float32
+var progressIncrementer chan float32
+
 func main() {
+	// Setup a separate channel to provide ticks to increment progress
+	progressIncrementer = make(chan float32)
+	go func() {
+		for {
+			time.Sleep(time.Second / 25)
+			progressIncrementer <- 0.004
+		}
+	}()
+
 	go func() {
 		// create new window
 		w := new(app.Window)
@@ -23,6 +37,7 @@ func main() {
 		}
 		os.Exit(0)
 	}()
+
 	app.Main()
 }
 
@@ -30,26 +45,41 @@ type C = layout.Context
 type D = layout.Dimensions
 
 func draw(w *app.Window) error {
-
 	// ops are the operations from the UI
 	var ops op.Ops
 
 	// startButton is a clickable widget
 	var startButton widget.Clickable
 
+	// is the egg boiling?
+	var boiling bool
+
 	// th defines the material design style
 	th := material.NewTheme()
 
-	// listen for events in the window.
-	for {
+	// listen for events in the incrementer channel
+	go func() {
+		for p := range progressIncrementer {
+			if boiling && progress < 1 {
+				progress += p
+				// Force a redraw by invalidating the frame
+				w.Invalidate()
+			}
+		}
+	}()
 
-		// detect what type of event
+	for {
+		// listen for events in the window
 		switch e := w.Event().(type) {
 
-		// this is sent when the application should re-render.
+		// this is sent when the application should re-render
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 			// Let's try out the flexbox layout concept
+			if startButton.Clicked(gtx) {
+				boiling = !boiling
+			}
+
 			layout.Flex{
 				// Vertical alignment, from top to bottom
 				Axis: layout.Vertical,
@@ -58,18 +88,30 @@ func draw(w *app.Window) error {
 			}.Layout(gtx,
 				layout.Rigid(
 					func(gtx C) D {
-						// ONE: First define margins around the button using layout.Inset ...
+						bar := material.ProgressBar(th, progress)
+						return bar.Layout(gtx)
+					},
+				),
+				layout.Rigid(
+					func(gtx C) D {
+						// We start by defining a set of margins
 						margins := layout.Inset{
 							Top:    unit.Dp(25),
 							Bottom: unit.Dp(25),
 							Right:  unit.Dp(35),
 							Left:   unit.Dp(35),
 						}
-						// TWO: ... then we lay out those margins ...
+						// Then we lay out within those margins ...
 						return margins.Layout(gtx,
-							// THREE: ... and finally within the margins, we ddefine and lay out the button
+							// ...the same function we earlier used to create a button
 							func(gtx C) D {
-								btn := material.Button(th, &startButton, "Start")
+								var text string
+								if !boiling {
+									text = "Start"
+								} else {
+									text = "Stop"
+								}
+								btn := material.Button(th, &startButton, text)
 								return btn.Layout(gtx)
 							},
 						)
@@ -77,9 +119,11 @@ func draw(w *app.Window) error {
 				),
 			)
 			e.Frame(gtx.Ops)
-		// this is sent when the application is closed.
+
+		// this is sent when the application is closed
 		case app.DestroyEvent:
 			return e.Err
 		}
+
 	}
 }
