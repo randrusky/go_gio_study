@@ -40,8 +40,9 @@ func draw(w *app.Window) error {
 	// th defines the material design style
 	th := material.NewTheme()
 
-	// listen for events in the window
+	// listen for events in the window.
 	for {
+
 		// detect what type of event
 		switch e := w.Event().(type) {
 
@@ -55,23 +56,28 @@ func draw(w *app.Window) error {
 				// Empty space is left at the start, i.e. at the top
 				Spacing: layout.SpaceStart,
 			}.Layout(gtx,
-				// We insert to rigid elements
-				// First a button ...
 				layout.Rigid(
 					func(gtx C) D {
-						btn := material.Button(th, &startButton, "Start")
-						return btn.Layout(gtx)
+						// ONE: First define margins around the button using layout.Inset ...
+						margins := layout.Inset{
+							Top:    unit.Dp(25),
+							Bottom: unit.Dp(25),
+							Right:  unit.Dp(35),
+							Left:   unit.Dp(35),
+						}
+						// TWO: ... then we lay out those margins ...
+						return margins.Layout(gtx,
+							// THREE: ... and finally within the margins, we ddefine and lay out the button
+							func(gtx C) D {
+								btn := material.Button(th, &startButton, "Start")
+								return btn.Layout(gtx)
+							},
+						)
 					},
-				),
-				// ... then an empty spacer
-				layout.Rigid(
-					// The height of the spacer is 25 Device independent pixels
-					layout.Spacer{Height: unit.Dp(25)}.Layout,
 				),
 			)
 			e.Frame(gtx.Ops)
-
-		// this is sent when the application is closed
+		// this is sent when the application is closed.
 		case app.DestroyEvent:
 			return e.Err
 		}
