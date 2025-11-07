@@ -1,6 +1,8 @@
 package main
 
 import (
+	"image"
+	"image/color"
 	"log"
 	"os"
 	"time"
@@ -8,14 +10,16 @@ import (
 	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 )
 
 // Define the progress variables, a channel and a variable
-var progress float32
 var progressIncrementer chan float32
+var progress float32
 
 func main() {
 	// Setup a separate channel to provide ticks to increment progress
@@ -57,7 +61,7 @@ func draw(w *app.Window) error {
 	// th defines the material design style
 	th := material.NewTheme()
 
-	// listen for events in the incrementer channel
+	// listen for events in the incrementor channel
 	go func() {
 		for p := range progressIncrementer {
 			if boiling && progress < 1 {
@@ -69,10 +73,10 @@ func draw(w *app.Window) error {
 	}()
 
 	for {
-		// listen for events in the window
+		// listen for events
 		switch e := w.Event().(type) {
 
-		// this is sent when the application should re-render
+		// this is sent when the application should re-render.
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 			// Let's try out the flexbox layout concept
@@ -88,10 +92,28 @@ func draw(w *app.Window) error {
 			}.Layout(gtx,
 				layout.Rigid(
 					func(gtx C) D {
+						circle := clip.Ellipse{
+							// Hard coding the x coordinate. Try resizing the window
+							// Min: image.Pt(80, 0),
+							// Max: image.Pt(320, 240),
+							// Soft coding the x coordinate. Try resizing the window
+							Min: image.Pt(gtx.Constraints.Max.X/2-120, 0),
+							Max: image.Pt(gtx.Constraints.Max.X/2+120, 240),
+						}.Op(gtx.Ops)
+						color := color.NRGBA{R: 200, A: 255}
+						paint.FillShape(gtx.Ops, color, circle)
+						d := image.Point{Y: 400}
+						return layout.Dimensions{Size: d}
+					},
+				),
+
+				layout.Rigid(
+					func(gtx C) D {
 						bar := material.ProgressBar(th, progress)
 						return bar.Layout(gtx)
 					},
 				),
+
 				layout.Rigid(
 					func(gtx C) D {
 						// We start by defining a set of margins
@@ -120,7 +142,7 @@ func draw(w *app.Window) error {
 			)
 			e.Frame(gtx.Ops)
 
-		// this is sent when the application is closed
+		// this is sent when the application is closed.
 		case app.DestroyEvent:
 			return e.Err
 		}
